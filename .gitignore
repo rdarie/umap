@@ -22,3 +22,4 @@ venv
 
 # metadata from pip-installing repo
 umap_learn.egg-info
+.vscode/*
