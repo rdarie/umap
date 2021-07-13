@@ -274,7 +274,7 @@ def weighted_minkowski_grad(x, y, w=_mock_ones, p=2):
 def mahalanobis(x, y, vinv=_mock_identity):
     result = 0.0
 
-    diff = np.empty(x.shape[0], dtype=np.float64)
+    diff = np.empty(x.shape[0], dtype=np.float32)
 
     for i in range(x.shape[0]):
         diff[i] = x[i] - y[i]
@@ -292,7 +292,7 @@ def mahalanobis(x, y, vinv=_mock_identity):
 def mahalanobis_grad(x, y, vinv=_mock_identity):
     result = 0.0
 
-    diff = np.empty(x.shape[0], dtype=np.float64)
+    diff = np.empty(x.shape[0], dtype=np.float32)
 
     for i in range(x.shape[0]):
         diff[i] = x[i] - y[i]
@@ -519,15 +519,25 @@ def haversine_grad(x, y):
 
     d = 2.0 * np.arcsin(np.sqrt(min(max(abs(a_1), 0), 1)))
     denom = np.sqrt(abs(a_1 - 1)) * np.sqrt(abs(a_1))
-    grad = np.array(
-        [
-            (
-                sin_lat * cos_lat
-                - np.sin(x[0] + np.pi / 2) * np.cos(y[0] + np.pi / 2) * sin_long ** 2
-            ),
-            (np.cos(x[0] + np.pi / 2) * np.cos(y[0] + np.pi / 2) * sin_long * cos_long),
-        ]
-    ) / (denom + 1e-6)
+    grad = (
+        np.array(
+            [
+                (
+                    sin_lat * cos_lat
+                    - np.sin(x[0] + np.pi / 2)
+                    * np.cos(y[0] + np.pi / 2)
+                    * sin_long ** 2
+                ),
+                (
+                    np.cos(x[0] + np.pi / 2)
+                    * np.cos(y[0] + np.pi / 2)
+                    * sin_long
+                    * cos_long
+                ),
+            ]
+        )
+        / (denom + 1e-6)
+    )
     return d, grad
 
 
@@ -714,11 +724,11 @@ def log_single_beta(x):
 
 @numba.njit()
 def ll_dirichlet(data1, data2):
-    """ The symmetric relative log likelihood of rolling data2 vs data1
+    """The symmetric relative log likelihood of rolling data2 vs data1
     in n trials on a die that rolled data1 in sum(data1) trials.
-    
+
     ..math::
-        D(data1, data2) = DirichletMultinomail(data2 | data1)  
+        D(data1, data2) = DirichletMultinomail(data2 | data1)
     """
 
     n1 = np.sum(data1)
@@ -748,7 +758,7 @@ def ll_dirichlet(data1, data2):
 
 
 @numba.njit(fastmath=True)
-def symmetric_kl(x, y, z=1e-11):
+def symmetric_kl(x, y, z=1e-11):  # pragma: no cover
     """
     symmetrized KL divergence between two probability distributions
 
@@ -779,7 +789,7 @@ def symmetric_kl(x, y, z=1e-11):
 
 
 @numba.njit(fastmath=True)
-def symmetric_kl_grad(x, y, z=1e-11):
+def symmetric_kl_grad(x, y, z=1e-11):  # pragma: no cover
     """
     symmetrized KL divergence and its gradient
 
@@ -846,7 +856,9 @@ def correlation_grad(x, y):
 
 
 @numba.njit(fastmath=True)
-def sinkhorn_distance(x, y, M=_mock_identity, cost=_mock_cost, maxiter=64):
+def sinkhorn_distance(
+    x, y, M=_mock_identity, cost=_mock_cost, maxiter=64
+):  # pragma: no cover
     p = (x / x.sum()).astype(np.float32)
     q = (y / y.sum()).astype(np.float32)
 
@@ -870,7 +882,7 @@ def sinkhorn_distance(x, y, M=_mock_identity, cost=_mock_cost, maxiter=64):
 
 
 @numba.njit(fastmath=True)
-def spherical_gaussian_energy_grad(x, y):
+def spherical_gaussian_energy_grad(x, y):  # pragma: no cover
     mu_1 = x[0] - y[0]
     mu_2 = x[1] - y[1]
 
@@ -888,7 +900,7 @@ def spherical_gaussian_energy_grad(x, y):
 
 
 @numba.njit(fastmath=True)
-def diagonal_gaussian_energy_grad(x, y):
+def diagonal_gaussian_energy_grad(x, y):  # pragma: no cover
     mu_1 = x[0] - y[0]
     mu_2 = x[1] - y[1]
 
@@ -923,7 +935,7 @@ def diagonal_gaussian_energy_grad(x, y):
 
 
 @numba.njit(fastmath=True)
-def gaussian_energy_grad(x, y):
+def gaussian_energy_grad(x, y):  # pragma: no cover
     mu_1 = x[0] - y[0]
     mu_2 = x[1] - y[1]
 
@@ -996,7 +1008,7 @@ def gaussian_energy_grad(x, y):
 
 
 @numba.njit(fastmath=True)
-def spherical_gaussian_grad(x, y):
+def spherical_gaussian_grad(x, y):  # pragma: no cover
     mu_1 = x[0] - y[0]
     mu_2 = x[1] - y[1]
 
@@ -1243,6 +1255,31 @@ def parallel_special_metric(X, Y=None, metric=hellinger):
             for j in range(Y.shape[0]):
                 result[i, j] = metric(X[i], Y[j])
 
+    return result
+
+
+# We can gain efficiency by chunking the matrix into blocks;
+# this keeps data vectors in cache better
+@numba.njit(parallel=True, nogil=True)
+def chunked_parallel_special_metric(X, Y=None, metric=hellinger, chunk_size=16):
+    if Y is None:
+        XX, symmetrical = X, True
+        row_size = col_size = X.shape[0]
+    else:
+        XX, symmetrical = Y, False
+        row_size, col_size = X.shape[0], Y.shape[0]
+
+    result = np.zeros((row_size, col_size), dtype=np.float32)
+    n_row_chunks = (row_size // chunk_size) + 1
+    for chunk_idx in numba.prange(n_row_chunks):
+        n = chunk_idx * chunk_size
+        chunk_end_n = min(n + chunk_size, row_size)
+        m_start = n if symmetrical else 0
+        for m in range(m_start, col_size, chunk_size):
+            chunk_end_m = min(m + chunk_size, col_size)
+            for i in range(n, chunk_end_n):
+                for j in range(m, chunk_end_m):
+                    result[i, j] = metric(X[i], XX[j])
     return result
 
 

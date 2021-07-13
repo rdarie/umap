@@ -9,15 +9,7 @@ import locale
 import numba
 import numpy as np
 
-from umap.utils import (
-    tau_rand,
-    norm,
-    make_heap,
-    heap_push,
-    rejection_sample,
-    build_candidates,
-    deheap_sort,
-)
+from umap.utils import norm
 
 locale.setlocale(locale.LC_NUMERIC, "C")
 
@@ -160,9 +152,62 @@ def general_sset_intersection(
     result_row,
     result_col,
     result_val,
+    right_complement=False,
     mix_weight=0.5,
 ):
 
+    left_min = max(data1.min() / 2.0, 1.0e-8)
+    if right_complement:
+        right_min = min(
+            max((1.0 - data2).min() / 2.0, 1.0e-8), 1e-4
+        )  # All right vals may be large!
+    else:
+        right_min = min(
+            max(data2.min() / 2.0, 1.0e-8), 1e-4
+        )  # All right vals may be large!
+
+    for idx in range(result_row.shape[0]):
+        i = result_row[idx]
+        j = result_col[idx]
+
+        left_val = left_min
+        for k in range(indptr1[i], indptr1[i + 1]):
+            if indices1[k] == j:
+                left_val = data1[k]
+
+        right_val = right_min
+        for k in range(indptr2[i], indptr2[i + 1]):
+            if indices2[k] == j:
+                if right_complement:
+                    right_val = 1.0 - data2[k]
+                else:
+                    right_val = data2[k]
+
+        if left_val > left_min or right_val > right_min:
+            if mix_weight < 0.5:
+                result_val[idx] = left_val * pow(
+                    right_val, mix_weight / (1.0 - mix_weight)
+                )
+            else:
+                result_val[idx] = (
+                    pow(left_val, (1.0 - mix_weight) / mix_weight) * right_val
+                )
+
+    return
+
+
+@numba.njit()
+def general_sset_union(
+    indptr1,
+    indices1,
+    data1,
+    indptr2,
+    indices2,
+    data2,
+    result_row,
+    result_col,
+    result_val,
+):
     left_min = max(data1.min() / 2.0, 1.0e-8)
     right_min = max(data2.min() / 2.0, 1.0e-8)
 
@@ -180,15 +225,7 @@ def general_sset_intersection(
             if indices2[k] == j:
                 right_val = data2[k]
 
-        if left_val > left_min or right_val > right_min:
-            if mix_weight < 0.5:
-                result_val[idx] = left_val * pow(
-                    right_val, mix_weight / (1.0 - mix_weight)
-                )
-            else:
-                result_val[idx] = (
-                    pow(left_val, (1.0 - mix_weight) / mix_weight) * right_val
-                )
+        result_val[idx] = left_val + right_val - left_val * right_val
 
     return
 
@@ -251,14 +288,16 @@ def sparse_canberra(ind1, data1, ind2, data2):
 
 @numba.njit()
 def sparse_bray_curtis(ind1, data1, ind2, data2):  # pragma: no cover
-    abs_data1 = np.abs(data1)
-    abs_data2 = np.abs(data2)
-    denom_inds, denom_data = sparse_sum(ind1, abs_data1, ind2, abs_data2)
+    denom_inds, denom_data = sparse_sum(ind1, data1, ind2, data2)
+    denom_data = np.abs(denom_data)
 
     if denom_data.shape[0] == 0:
         return 0.0
 
     denominator = np.sum(denom_data)
+
+    if denominator == 0:
+        return 0.0
 
     numer_inds, numer_data = sparse_diff(ind1, data1, ind2, data2)
     numer_data = np.abs(numer_data)
@@ -552,7 +591,7 @@ sparse_named_distances = {
     # Other distances
     "canberra": sparse_canberra,
     "ll_dirichlet": sparse_ll_dirichlet,
-    # 'braycurtis': sparse_bray_curtis,
+    'braycurtis': sparse_bray_curtis,
     # Binary distances
     "hamming": sparse_hamming,
     "jaccard": sparse_jaccard,

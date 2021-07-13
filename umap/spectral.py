@@ -7,6 +7,7 @@ import scipy.sparse.csgraph
 
 from sklearn.manifold import SpectralEmbedding
 from sklearn.metrics import pairwise_distances
+from sklearn.metrics.pairwise import _VALID_METRICS as SKLEARN_PAIRWISE_VALID_METRICS
 
 from umap.distances import pairwise_special_metric, SPECIAL_METRICS
 from umap.sparse import SPARSE_SPECIAL_METRICS, sparse_named_distances
@@ -55,6 +56,9 @@ def component_layout(
         The ``dim``-dimensional embedding of the ``n_components``-many
         connected components.
     """
+    if data is None:
+        # We don't have data to work with; just guess
+        return np.random.random(size=(n_components, dim)) * 10.0
 
     component_centroids = np.empty((n_components, data.shape[1]), dtype=np.float64)
 
@@ -93,18 +97,20 @@ def component_layout(
 
         if metric in SPECIAL_METRICS:
             distance_matrix = pairwise_special_metric(
-                component_centroids, metric=metric
+                component_centroids, metric=metric, kwds=metric_kwds,
             )
         elif metric in SPARSE_SPECIAL_METRICS:
             distance_matrix = pairwise_special_metric(
-                component_centroids, metric=SPARSE_SPECIAL_METRICS[metric]
+                component_centroids,
+                metric=SPARSE_SPECIAL_METRICS[metric],
+                kwds=metric_kwds,
             )
         else:
-            if callable(
-                metric
-            ) and scipy.sparse.isspmatrix(data):
+            if callable(metric) and scipy.sparse.isspmatrix(data):
                 function_to_name_mapping = {
-                    v: k for k, v in sparse_named_distances.items()
+                    sparse_named_distances[k]: k for k in
+                    set(SKLEARN_PAIRWISE_VALID_METRICS) &
+                    set(sparse_named_distances.keys())
                 }
                 try:
                     metric_name = function_to_name_mapping[metric]
@@ -204,7 +210,7 @@ def multi_component_layout(
         distances = pairwise_distances([meta_embedding[label]], meta_embedding)
         data_range = distances[distances > 0.0].min() / 2.0
 
-        if component_graph.shape[0] < 2 * dim:
+        if component_graph.shape[0] < 2 * dim or component_graph.shape[0] <= dim + 1:
             result[component_labels == label] = (
                 random_state.uniform(
                     low=-data_range,

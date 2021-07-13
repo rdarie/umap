@@ -15,7 +15,7 @@ def readme():
 
 configuration = {
     "name": "umap-learn",
-    "version": "0.4.6",
+    "version": "0.5.1",
     "description": "Uniform Manifold Approximation and Projection",
     "long_description": readme(),
     "long_description_content_type": "text/x-rst",
@@ -32,9 +32,10 @@ configuration = {
         "Operating System :: POSIX",
         "Operating System :: Unix",
         "Operating System :: MacOS",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
     ],
     "keywords": "dimension reduction t-sne manifold",
     "url": "http://github.com/lmcinnes/umap",
@@ -44,9 +45,10 @@ configuration = {
     "packages": ["umap"],
     "install_requires": [
         "numpy >= 1.17",
-        "scikit-learn >= 0.20",
-        "scipy >= 1.3.1",
-        "numba >= 0.46, != 0.47",
+        "scikit-learn >= 0.22",
+        "scipy >= 1.0",
+        "numba >= 0.49",
+        "pynndescent >= 0.5",
     ],
     "extras_require": {
         "plot": [
@@ -56,13 +58,15 @@ configuration = {
             "bokeh",
             "holoviews",
             "colorcet",
+            "seaborn",
+            "scikit-image",
         ],
-        "performance": ["pynndescent >= 0.4", "tbb >= 2019.5"],
+        "parametric_umap": ["tensorflow >= 2.1", "tensorflow-probability >= 0.10"],
     },
     "ext_modules": [],
     "cmdclass": {},
-    "test_suite": "nose.collector",
-    "tests_require": ["nose"],
+    "test_suite": "pytest",
+    "tests_require": ["pytest"],
     "data_files": (),
     "zip_safe": False,
 }

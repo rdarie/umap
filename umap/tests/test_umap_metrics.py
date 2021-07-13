@@ -270,6 +270,10 @@ def test_sparse_correlation(sparse_spatial_data):
     sparse_spatial_check("correlation", sparse_spatial_data)
 
 
+def test_sparse_braycurtis(sparse_spatial_data):
+    sparse_spatial_check("braycurtis", sparse_spatial_data)
+
+
 # ---------------------------
 # Sparse Binary Metric Tests
 # ---------------------------
@@ -437,7 +441,7 @@ def test_sparse_hellinger(sparse_spatial_data):
         test_matrix,
         dist_matrix,
         err_msg="Sparse distances don't match " "for metric hellinger",
-        decimal=4,
+        decimal=3,
     )
 
     # Ensure ll_dirichlet runs

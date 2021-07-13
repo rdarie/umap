@@ -166,7 +166,7 @@ proper handling of missing data.
    :alt: Diagram of culmen measurements on a penguin
 
 See the `github repostiory <https://github.com/allisonhorst/penguins>`__
-for more details about the daataset itself. It consists of measurements
+for more details about the dataset itself. It consists of measurements
 of bill (culmen) and flippers and weights of three species of penguins,
 along with some other metadata about the penguins. In total we have 334
 different penguins measured. Visualizing this data is a little bit
@@ -248,7 +248,7 @@ then returns the transformed data as a numpy array.
 The result is an array with 334 samples, but only two feature columns
 (instead of the four we started with). This is because, by default, UMAP
 reduces down to 2D. Each row of the array is a 2-dimensional
-representation of the corresponding flower. Thus we can plot the
+representation of the corresponding penguin. Thus we can plot the
 ``embedding`` as a standard scatterplot and color by the target array
 (since it applies to the transformed data which is in the same order as
 the original).
@@ -386,7 +386,7 @@ is not going to be sufficient for this data.
 
 In contrast we can try using UMAP again. It works exactly as before:
 construct a model, train the model, and then look at the transformed
-data. TO demonstrate more of UMAP we'll go about it differently this
+data. To demonstrate more of UMAP we'll go about it differently this
 time and simply use the ``fit`` method rather than the ``fit_transform``
 approach we used for Penguins.
 
